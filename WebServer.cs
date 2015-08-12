@@ -8,14 +8,19 @@ using System.IO;
 
 namespace Redecode.Archimede
 {
-
+    
+    public delegate void OnConnectHandler();
+    public delegate void OnDisconnectHandler();
+    public delegate void OnWebRequestHandler(HttpListenerRequest request, HttpListenerResponse response, HttpListenerOutput output);
+    
     public static class WebServer
-    {
+    {        
         private static readonly HttpListener httpListener = new HttpListener("http", 80);
         private static NetworkInterface networkInterface;
-
-        public static event OnWebRequestHandler OnWebRequest;
-        public delegate void OnWebRequestHandler(HttpListenerRequest request, HttpListenerResponse response, HttpOutput output);
+        
+        public static event OnConnectHandler OnConnect;
+        public static event OnDisconnectHandler OnDisconnect;
+        public static event OnWebRequestHandler OnWebRequest;        
 
         public class HttpRequestEventArgs : EventArgs 
     {
@@ -73,8 +78,11 @@ namespace Redecode.Archimede
                     IPAddress = null;
                 }
             }
-            
-            
+
+            if (OnConnect != null)
+            {
+                OnConnect();
+            }            
 
             Thread webServerThread = new Thread(WebServerThread);
             webServerThread.Start();
@@ -89,7 +97,10 @@ namespace Redecode.Archimede
                     var ctx = httpListener.GetContext();
                     try
                     {
-                        OnWebRequest(ctx.Request, ctx.Response, new HttpOutput(ctx));
+                        if (OnWebRequest != null)
+                        {                            
+                            OnWebRequest(ctx.Request, ctx.Response, new HttpListenerOutput(ctx));
+                        }
                     }
                     catch { } // suppress any exceptions
                     finally
@@ -103,8 +114,18 @@ namespace Redecode.Archimede
             {
                 Debug.Print(ex.Message);
                 httpListener.Stop();
-                networkInterface.RenewDhcpLease();
+                
                 IPAddress = null;
+                if (OnDisconnect != null)
+                {
+                    OnDisconnect();
+                }
+
+                if (static_IP == "")
+                {
+                    networkInterface.RenewDhcpLease();
+                }
+
                 Start();
             } 
         }
@@ -150,12 +171,12 @@ namespace Redecode.Archimede
          */
     }
     
-    public class HttpOutput
+    public class HttpListenerOutput
     {
 
         public HttpListenerContext Context { get; private set; }
         
-        public HttpOutput(HttpListenerContext ctx)
+        public HttpListenerOutput(HttpListenerContext ctx)
         {
             Context = ctx;
         }
