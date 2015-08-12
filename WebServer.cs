@@ -65,7 +65,7 @@ namespace Redecode.Archimede
                         networkInterface.EnableDhcp();
                     }
 
-                    Thread.Sleep(1000);
+                    Thread.Sleep(500);
 
                     if (networkInterface.IPAddress != "0.0.0.0")
                     {
