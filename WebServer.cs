@@ -5,101 +5,73 @@ using System.Threading;
 using System;
 using System.Text;
 using System.IO;
+using System.Collections;
 
 namespace Redecode.Archimede
 {
     
-    public delegate void OnConnectHandler();
-    public delegate void OnDisconnectHandler();
-    public delegate void OnWebRequestHandler(HttpListenerRequest request, HttpListenerResponse response, HttpListenerOutput output);
-    
+    public delegate void OnWebRequestHandler(HttpListenerRequest request, HttpListenerResponse response);
+    public delegate bool OnAuth(HttpListenerRequest request);
+
     public static class WebServer
     {        
+
         private static readonly HttpListener httpListener = new HttpListener("http", 80);
-        private static NetworkInterface networkInterface;
-        
-        public static event OnConnectHandler OnConnect;
-        public static event OnDisconnectHandler OnDisconnect;
-        public static event OnWebRequestHandler OnWebRequest;        
+
+        public static event OnWebRequestHandler OnWebRequest;
+        public static event OnAuth OnAuth;
+
+        private static ArrayList ListUrlAction = new ArrayList();
+     
 
         public class HttpRequestEventArgs : EventArgs 
-    {
-        public HttpListenerContext Context { get; private set; }
-        public byte[] ResponseBytes { get; set; }
-
-        public HttpRequestEventArgs(HttpListenerContext ctx)
         {
-            Context = ctx;
-        }
-    }
+            public HttpListenerContext Context { get; private set; }
+            public byte[] ResponseBytes { get; set; }
 
-        public static string IPAddress;
-
-        public static string static_IP;
-        public static string static_Mask;
-        public static string static_Gateway;
-
-        public static void SetStaticIp(string ip, string mask, string gateway)
-        {
-            static_IP = ip;
-            static_Mask = mask;
-            static_Gateway = gateway;
+            public HttpRequestEventArgs(HttpListenerContext ctx)
+            {
+                Context = ctx;
+            }
         }
 
         public static void Start() {
-
-            NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
-            networkInterface = interfaces[0];
-            
-            while (IPAddress == null)
-            {
-                try
-                {
-                    if (static_IP != "")
-                    {
-                        networkInterface.EnableStaticIP(static_IP, static_Mask, static_Gateway);
-                    }
-                    else
-                    {
-                        networkInterface.EnableDynamicDns();
-                        networkInterface.EnableDhcp();
-                    }
-
-                    Thread.Sleep(500);
-
-                    if (networkInterface.IPAddress != "0.0.0.0")
-                    {
-                        IPAddress = networkInterface.IPAddress;
-                        httpListener.Start();
-                    }
-                }
-                catch
-                {
-                    IPAddress = null;
-                }
-            }
-
-            if (OnConnect != null)
-            {
-                OnConnect();
-            }            
-
             Thread webServerThread = new Thread(WebServerThread);
             webServerThread.Start();
         }
 
         static void WebServerThread()
         {
+            //---- CONNECTING 
+            Ethernet.Connect();
+
+            httpListener.Start();    
+
+            //----- MANAGE REQUEST
             try
             {
                 while (httpListener.IsListening)
                 {
                     var ctx = httpListener.GetContext();
+                    //var webServerRequest = new WebServerRequest() { HttpRequest = ctx.Request };
+                    //var webServerResponse = new WebServerResponse() { HttpResponse = ctx.Response };
                     try
                     {
                         if (OnWebRequest != null)
-                        {                            
-                            OnWebRequest(ctx.Request, ctx.Response, new HttpListenerOutput(ctx));
+                        {
+                            OnWebRequest(ctx.Request, ctx.Response);
+                        }
+
+                        foreach (UrlAction webApi in ListUrlAction)
+                        {
+                            if (webApi.pattern == ctx.Request.RawUrl) {
+                                if (!webApi.required_auth || OnAuth(ctx.Request))
+                                {
+                                    webApi.handler(ctx.Request, ctx.Response);
+                                    break;
+                                }                                
+                            }
+
                         }
                     }
                     catch { } // suppress any exceptions
@@ -114,20 +86,18 @@ namespace Redecode.Archimede
             {
                 Debug.Print(ex.Message);
                 httpListener.Stop();
-                
-                IPAddress = null;
-                if (OnDisconnect != null)
-                {
-                    OnDisconnect();
-                }
+                Ethernet.Disconnect();
+            }
+        }
 
-                if (static_IP == "")
-                {
-                    networkInterface.RenewDhcpLease();
-                }
+        public static void UrlAction(string pattern, OnWebRequestHandler handler, bool required_auth = false)
+        {
 
-                Start();
-            } 
+            ListUrlAction.Add(new UrlAction() {
+                pattern = pattern,
+                handler = handler,
+                required_auth = required_auth
+            });
         }
         /*
         public void MainLoop()
@@ -170,29 +140,44 @@ namespace Redecode.Archimede
         }
          */
     }
-    
-    public class HttpListenerOutput
+
+    public static class HttpListenerRequestExtensions 
     {
-
-        public HttpListenerContext Context { get; private set; }
-        
-        public HttpListenerOutput(HttpListenerContext ctx)
+        public static string Post(this HttpListenerRequest request,  string str)
         {
-            Context = ctx;
+            using (StreamReader stream = new StreamReader(request.InputStream))
+            {
+                return stream.ReadToEnd();
+            }
+        }
+    }
+
+    public static class HttpListenerResponseExtensions
+    {
+        public static void Bytes(this HttpListenerResponse response, byte[] bytes)
+        {
+            using (StreamWriter stream = new StreamWriter(response.OutputStream))
+            {
+                response.ContentLength64 = stream.BaseStream.Length;
+                stream.Write(bytes);
+            }
         }
 
-        public void Bytes(byte[] bytes)
+        public static void String(this HttpListenerResponse response, string str)
         {
-            Context.Response.ContentLength64 = bytes.Length;
-            Context.Response.OutputStream.Write(bytes, 0, bytes.Length);
+            using (StreamWriter stream = new StreamWriter(response.OutputStream))
+            {
+                response.ContentLength64 = stream.BaseStream.Length;
+                stream.Write(str);
+            }
         }
+    }
 
-        public void String(string str)
-        {
-            byte[] bytes = Encoding.UTF8.GetBytes(str);
-            Context.Response.ContentLength64 = bytes.Length;
-            Context.Response.OutputStream.Write(bytes, 0, bytes.Length);
-        }
+    struct UrlAction
+    {
+        public string pattern;
+        public OnWebRequestHandler handler;
+        public bool required_auth;
     }
      
 }
