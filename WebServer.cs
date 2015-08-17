@@ -22,18 +22,6 @@ namespace Redecode.Archimede
         public static event OnAuth OnAuth;
 
         private static ArrayList ListUrlAction = new ArrayList();
-     
-
-        public class HttpRequestEventArgs : EventArgs 
-        {
-            public HttpListenerContext Context { get; private set; }
-            public byte[] ResponseBytes { get; set; }
-
-            public HttpRequestEventArgs(HttpListenerContext ctx)
-            {
-                Context = ctx;
-            }
-        }
 
         public static void Start() {
             Thread webServerThread = new Thread(WebServerThread);
@@ -99,46 +87,6 @@ namespace Redecode.Archimede
                 required_auth = required_auth
             });
         }
-        /*
-        public void MainLoop()
-        {
-            Debug.Print("Webserver running...");
-
-            while (_listener.IsListening)
-            {
-                {
-                    HttpListenerContext ctx = _listener.GetContext();
-                    try
-                    {
-                        if(ManageRequest != null)
-                        {
-                            HttpRequestEventArgs e = new HttpRequestEventArgs(ctx);
-
-                            ManageRequest(this, e);
-                            if(e.ResponseBytes != null && e.ResponseBytes.Length > 0)
-                            {
-                                ctx.Response.ContentLength64 = e.ResponseBytes.Length;
-                                ctx.Response.OutputStream.Write(e.ResponseBytes, 0, e.ResponseBytes.Length);
-                            }
-                        }
-                    }
-                    catch { } // sopprimo ogni eventuale eccezione
-                    finally
-                    {
-                        // Chiudo lo stream di output
-                        ctx.Response.OutputStream.Close();
-                    }
-                }
-            }
-        }
-
-        // suppress any exceptions
-        public void Stop()
-        {
-            _listener.Stop();
-            _listener.Close();
-        }
-         */
     }
 
     public static class HttpListenerRequestExtensions 
