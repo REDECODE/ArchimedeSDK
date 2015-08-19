@@ -20,8 +20,8 @@ namespace Redecode.Archimede
         public string Username;
         public string Password;
 
-        Socket SocketCommands;
-        Socket SocketData;
+        SocketStable SocketCommands;
+        SocketStable SocketData;
 
         public FtpClient()
         {
@@ -50,39 +50,22 @@ namespace Redecode.Archimede
 
                 Ethernet.Connect();
 
+                SocketCommands = new SocketStable(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);                    
+                SocketData = null;
+                //int passivePort = -1; // Used with socketB when using the data connection
 
-                do
+                if (!SocketCommands.Connect(new IPEndPoint(IPAddress.Parse(IP), Port)))
                 {
-                    SocketCommands = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);                    
-                    SocketData = null;
-                    //int passivePort = -1; // Used with socketB when using the data connection
-
-                    IPEndPoint ipep = new IPEndPoint(IPAddress.Parse(IP), Port);
-                    Thread tConnect = new Thread(() => Socket_Connect(SocketCommands, ipep));
-                    tConnect.Start();
-                    tConnect.Join(1000);
-
-                    if (tConnect.ThreadState == ThreadState.Stopped)
-                    {
-                        connected = true;                        
-                        // Read welcome message and return
-                        rString = readTextFromSocket(SocketCommands);
-
-                        // Login to the server
-                        sendTextToSocket(SocketCommands, "USER " + Username + "\r\n");
-                        rString = readTextFromSocket(SocketCommands);
-                        sendTextToSocket(SocketCommands, "PASS " + Password + "\r\n");
-                        rString = readTextFromSocket(SocketCommands);
-
-                        // Send command Passive Mode
-                        //sendTextToSocket(SocketCommands, "PASV\r\n");
-                        //rString = readTextFromSocket(SocketCommands);
-                        //passivePort = parseForPasvPort(rString); // Server sends port to connect on
-                    }
-
-                    tConnect.Abort();
+                    SocketCommands.Close();
+                    SocketCommands = null;
+                    return false;
+                }
                     
-                } while (!connected);
+                rString = readTextFromSocket(SocketCommands);
+                sendTextToSocket(SocketCommands, "USER " + Username + "\r\n");
+                rString = readTextFromSocket(SocketCommands);
+                sendTextToSocket(SocketCommands, "PASS " + Password + "\r\n");
+                rString = readTextFromSocket(SocketCommands);
 
                 return connected;
             }
@@ -136,18 +119,29 @@ namespace Redecode.Archimede
             //throw new Exception("Not implemented");
         }
 
-        public bool DownloadFile(string path)
+        public bool DownloadFile(string remote_path, string local_path)
         {
-            string fileContent = ReadTextFile(path);
-            if (fileContent != null)
+            try
             {
+                byte[] fileContent = ReadBinaryFile(remote_path);
+                if (fileContent == null)
+                {
+                    return false;
+                }
 
+                FileStream FileHandle = new FileStream(local_path, FileMode.OpenOrCreate);
+                FileHandle.Write(fileContent, 0, fileContent.Length);
+                FileHandle.Close();
+
+                return true;
             }
-
-            return true;
+            catch
+            {
+                return false;
+            }
         }
 
-        public string ReadTextFile(string path)
+        public string ReadTextFile(string remote_path)
         {
             try
             {
@@ -157,7 +151,7 @@ namespace Redecode.Archimede
                 rString = readTextFromSocket(SocketCommands);
                 using (SocketData = SocketPassiveMode())
                 {
-                    sendTextToSocket(SocketCommands, "RETR " + path + "\r\n");
+                    sendTextToSocket(SocketCommands, "RETR " + remote_path + "\r\n");
                     rString = readTextFromSocket(SocketCommands);
                     data = readTextFromSocket(SocketData);
                     SocketData.Close();
@@ -171,7 +165,7 @@ namespace Redecode.Archimede
 
         }
 
-        public byte[] ReadBinaryFile(string path)
+        public byte[] ReadBinaryFile(string remote_path)
         {
             try
             {
@@ -181,7 +175,7 @@ namespace Redecode.Archimede
                 rString = readTextFromSocket(SocketCommands);
                 using (SocketData = SocketPassiveMode())
                 {                    
-                    sendTextToSocket(SocketCommands, "RETR " + path + "\r\n");
+                    sendTextToSocket(SocketCommands, "RETR " + remote_path + "\r\n");
                     rString = readTextFromSocket(SocketCommands);
                     data = readBytesFromSocket(SocketData);
                     SocketData.Close();
@@ -194,20 +188,13 @@ namespace Redecode.Archimede
             }
         }
 
-        public bool UploadFile(string path)
+        public bool UploadFile(string local_path, string remote_path)
         {
             try
-            {
-                string rString;
-                sendTextToSocket(SocketCommands, "TYPE A\r\n"); // Not sure if necessary, but FileZilla client does this
-                rString = readTextFromSocket(SocketCommands);
-                using (SocketData = SocketPassiveMode())
-                {
-                    sendTextToSocket(SocketCommands, "STOR madeOnMCU.txt\r\n");
-                    rString = readTextFromSocket(SocketCommands);
-                    sendTextToSocket(SocketData, "This was made on the MCU.");
-                    SocketData.Close();
-                }
+            {                
+                byte[] fileContent = File.ReadAllBytes(local_path);
+
+                WriteBinaryFile(remote_path, fileContent);
 
                 return true;
             }
@@ -217,7 +204,7 @@ namespace Redecode.Archimede
             }
         }
 
-        public bool WriteTextFile(string path, string data)
+        public bool WriteTextFile(string remote_path, string data)
         {
             try
             {
@@ -226,7 +213,7 @@ namespace Redecode.Archimede
                 rString = readTextFromSocket(SocketCommands);
                 using (SocketData = SocketPassiveMode())
                 {
-                    sendTextToSocket(SocketCommands, "STOR " + path + ".txt\r\n");
+                    sendTextToSocket(SocketCommands, "STOR " + remote_path + ".txt\r\n");
                     rString = readTextFromSocket(SocketCommands);
                     sendTextToSocket(SocketData, data);
                     SocketData.Close();
@@ -240,16 +227,17 @@ namespace Redecode.Archimede
             }
         }
 
-        public bool WriteBinaryFile(string path, byte[] data)
+        public bool WriteBinaryFile(string remote_path, byte[] data)
         {
             try
             {
                 string rString;
                 sendTextToSocket(SocketCommands, "TYPE I\r\n"); // Not sure if necessary, but FileZilla client does this
                 rString = readTextFromSocket(SocketCommands);
+
                 using (SocketData = SocketPassiveMode())
                 {
-                    sendTextToSocket(SocketCommands, "STOR " + path + "\r\n");
+                    sendTextToSocket(SocketCommands, "STOR " + remote_path + "\r\n");
                     rString = readTextFromSocket(SocketCommands);
                     sendBytesToSocket(SocketData, data);
                     SocketData.Close();
@@ -302,12 +290,12 @@ namespace Redecode.Archimede
             return receivedBytes.ToArray();
         }
 
-        private static void sendTextToSocket(Socket sock, string data)
+        private static void sendTextToSocket(SocketStable sock, string data)
         {
             sendBytesToSocket(sock, Encoding.UTF8.GetBytes(data));
         }
 
-        private static void sendBytesToSocket(Socket sock, byte[] data)
+        private static void sendBytesToSocket(SocketStable sock, byte[] data)
         {
             if (sock.Poll(1000, SelectMode.SelectWrite))
             {
@@ -315,13 +303,13 @@ namespace Redecode.Archimede
             }
         }
 
-        private Socket SocketPassiveMode()
+        private SocketStable SocketPassiveMode()
         {
             string rString;
             sendTextToSocket(SocketCommands, "PASV\r\n");
             rString = readTextFromSocket(SocketCommands);
             int passivePort = parseForPasvPort(rString);
-            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            SocketStable socket = new SocketStable(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.Connect(new IPEndPoint(IPAddress.Parse(IP), passivePort));
             return socket;
         }
@@ -339,12 +327,6 @@ namespace Redecode.Archimede
             string[] pieces = ip.Split(',');
 
             return System.Convert.ToInt32(pieces[pieces.Length - 2]) * 256 + System.Convert.ToInt32(pieces[pieces.Length - 1]);
-        }
-
-        private static void Socket_Connect(Socket socket, IPEndPoint ipep)
-        {
-            //Thread.Sleep(10);
-            socket.Connect(ipep);
         }
 
     }
