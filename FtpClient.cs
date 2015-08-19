@@ -6,6 +6,7 @@ using Microsoft.SPOT.Net.NetworkInformation;
 using System.Text;
 using System.Collections;
 using System.IO;
+using System.Threading;
 
 
 namespace Redecode.Archimede
@@ -40,38 +41,54 @@ namespace Redecode.Archimede
             Password = password;
         }
 
-        public void Connect()
+        public bool Connect()
         {
             try
             {
+                bool connected = false;
+                string rString = "";
+
                 Ethernet.Connect();
 
-                string rString = "";
-                SocketCommands = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                SocketCommands.SendTimeout = 1000;
-                SocketCommands.ReceiveTimeout = 1000;
-                SocketData = null;
-                //int passivePort = -1; // Used with socketB when using the data connection
 
-                IPEndPoint ipep = new IPEndPoint(IPAddress.Parse(IP), Port);
-                SocketCommands.Connect(ipep);
-                // Read welcome message and return
-                rString = readTextFromSocket(SocketCommands);
+                do
+                {
+                    SocketCommands = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);                    
+                    SocketData = null;
+                    //int passivePort = -1; // Used with socketB when using the data connection
 
-                // Login to the server
-                sendTextToSocket(SocketCommands, "USER " + Username + "\r\n");
-                rString = readTextFromSocket(SocketCommands);
-                sendTextToSocket(SocketCommands, "PASS " + Password + "\r\n");
-                rString = readTextFromSocket(SocketCommands);
+                    IPEndPoint ipep = new IPEndPoint(IPAddress.Parse(IP), Port);
+                    Thread tConnect = new Thread(() => Socket_Connect(SocketCommands, ipep));
+                    tConnect.Start();
+                    tConnect.Join(1000);
 
-                // Send command Passive Mode
-                //sendTextToSocket(SocketCommands, "PASV\r\n");
-                //rString = readTextFromSocket(SocketCommands);
-                //passivePort = parseForPasvPort(rString); // Server sends port to connect on
+                    if (tConnect.ThreadState == ThreadState.Stopped)
+                    {
+                        connected = true;                        
+                        // Read welcome message and return
+                        rString = readTextFromSocket(SocketCommands);
+
+                        // Login to the server
+                        sendTextToSocket(SocketCommands, "USER " + Username + "\r\n");
+                        rString = readTextFromSocket(SocketCommands);
+                        sendTextToSocket(SocketCommands, "PASS " + Password + "\r\n");
+                        rString = readTextFromSocket(SocketCommands);
+
+                        // Send command Passive Mode
+                        //sendTextToSocket(SocketCommands, "PASV\r\n");
+                        //rString = readTextFromSocket(SocketCommands);
+                        //passivePort = parseForPasvPort(rString); // Server sends port to connect on
+                    }
+
+                    tConnect.Abort();
+                    
+                } while (!connected);
+
+                return connected;
             }
             catch (Exception ex)
             {
-                throw ex;
+                return false;
             }
         }
 
@@ -322,6 +339,12 @@ namespace Redecode.Archimede
             string[] pieces = ip.Split(',');
 
             return System.Convert.ToInt32(pieces[pieces.Length - 2]) * 256 + System.Convert.ToInt32(pieces[pieces.Length - 1]);
+        }
+
+        private static void Socket_Connect(Socket socket, IPEndPoint ipep)
+        {
+            //Thread.Sleep(10);
+            socket.Connect(ipep);
         }
 
     }
