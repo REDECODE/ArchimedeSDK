@@ -6,51 +6,74 @@ using System.Threading;
 
 namespace Redecode.Archimede
 {
-    class SocketStable : Socket
+    public class SocketStable
     {
-        public SocketStable (AddressFamily addressFamily, SocketType socketType, ProtocolType protocolType) 
-            : base(addressFamily, socketType, protocolType) {
-                base.SendTimeout = 5000;
-                base.ReceiveTimeout = 5000;
-        }
 
-        new public bool Connect(EndPoint endPoint)
+        public static Socket Connect(string ip, int port, int timeout = 5000)
         {
             bool connected = false;
             int millsConnect = 0;
             int millsThread = 0;
+            IPEndPoint endPoint = new IPEndPoint(IPAddress.Parse(ip), port);
+            Socket socket = null;
 
             do
             {
-                Thread tConnect = new Thread(() => Socket_Connect(endPoint));
-                tConnect.Start();
-
-                //--- tConnect.Join(1000);  <--- it does't work if it's in a Timer callback. Solved with while() below
-                millsThread = 0;
-                while (tConnect.ThreadState != ThreadState.Stopped && millsThread < 1000)
+                try
                 {
-                    Thread.Sleep(10);
-                    millsThread += 10;
+                    socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+                    Thread tConnect = new Thread(() =>
+                    {
+                        try
+                        {
+                            socket.Connect(endPoint);
+                            connected = true;
+                        }
+                        catch
+                        {
+                            return;
+                        }
+                    });
+                    tConnect.Start();
+
+                    //--- tConnect.Join(1000);  <--- it does't work if it's in a Timer callback. Solved with while() below
+                    millsThread = 0;
+                    while (tConnect.IsAlive && millsThread < 1000)
+                    {
+                        Thread.Sleep(10);
+                        millsThread += 10;
+                    }
+
+                    tConnect.Abort();
+                }
+                catch
+                {
+
+                }
+                finally
+                {
+                    if (!connected)
+                    {
+                        if (socket != null)
+                        {
+                            socket.Close();
+                        }
+                        millsConnect += 1000;
+                        connected = false;
+                    }
                 }
 
-                if (tConnect.ThreadState == ThreadState.Stopped)
-                {
-                    connected = true;
-                }
-                else
-                {
-                    millsConnect += 1000;
-                }
+            } while (!connected && millsConnect < timeout);
 
-                tConnect.Abort();
-
-            } while (!connected && millsThread < base.SendTimeout);
-
-            return connected;
-        }
-
-        private void Socket_Connect (EndPoint endPoint) {
-            base.Connect(endPoint);
+            if (connected)
+            {
+                return socket;
+            }
+            else
+            {
+                return null;
+            }
         }
     }
 }

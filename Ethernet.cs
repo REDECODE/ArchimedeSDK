@@ -16,6 +16,7 @@ namespace Redecode.Archimede
         public static string static_Mask;
         public static string static_Gateway;
 
+        public static byte[] MACAddress;
         public static string IPAddress;
 
         public static event OnConnectHandler OnConnect;
@@ -36,6 +37,22 @@ namespace Redecode.Archimede
             static_Gateway = gateway;
         }
 
+        public static void UseMacAddress(byte[] mac)
+        {
+            MACAddress = mac;
+        }
+
+        public static void UseMacAddress(string mac)
+        {
+            string[] nums = mac.Split(':');
+            byte[] bytes = new byte[nums.Length];
+            for (int i=0; i<nums.Length; i++) {
+               bytes[i] = (byte)Convert.ToInt32(nums[i], 16);            
+            }
+
+            MACAddress = bytes;
+        }
+
         
 
         public static void Connect()
@@ -47,6 +64,11 @@ namespace Redecode.Archimede
 
             NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
             networkInterface = interfaces[0];
+
+            if (MACAddress != null)
+            {
+                networkInterface.PhysicalAddress = MACAddress;
+            }
 
             while (IPAddress == null)
             {

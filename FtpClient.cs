@@ -20,8 +20,10 @@ namespace Redecode.Archimede
         public string Username;
         public string Password;
 
-        SocketStable SocketCommands;
-        SocketStable SocketData;
+        Socket SocketCommands;
+        Socket SocketData;
+
+        int Timeout = 5000;
 
         public FtpClient()
         {
@@ -41,8 +43,10 @@ namespace Redecode.Archimede
             Password = password;
         }
 
-        public bool Connect()
+        public bool Connect(int timeout = 5000)
         {
+            Timeout = timeout;
+
             try
             {
                 bool connected = false;
@@ -50,14 +54,12 @@ namespace Redecode.Archimede
 
                 Ethernet.Connect();
 
-                SocketCommands = new SocketStable(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);                    
+                SocketCommands = SocketStable.Connect(IP, Port, Timeout); 
                 SocketData = null;
                 //int passivePort = -1; // Used with socketB when using the data connection
 
-                if (!SocketCommands.Connect(new IPEndPoint(IPAddress.Parse(IP), Port)))
+                if (SocketCommands == null)
                 {
-                    SocketCommands.Close();
-                    SocketCommands = null;
                     return false;
                 }
                     
@@ -290,12 +292,12 @@ namespace Redecode.Archimede
             return receivedBytes.ToArray();
         }
 
-        private static void sendTextToSocket(SocketStable sock, string data)
+        private static void sendTextToSocket(Socket sock, string data)
         {
             sendBytesToSocket(sock, Encoding.UTF8.GetBytes(data));
         }
 
-        private static void sendBytesToSocket(SocketStable sock, byte[] data)
+        private static void sendBytesToSocket(Socket sock, byte[] data)
         {
             if (sock.Poll(1000, SelectMode.SelectWrite))
             {
@@ -303,15 +305,13 @@ namespace Redecode.Archimede
             }
         }
 
-        private SocketStable SocketPassiveMode()
+        private Socket SocketPassiveMode()
         {
             string rString;
             sendTextToSocket(SocketCommands, "PASV\r\n");
             rString = readTextFromSocket(SocketCommands);
             int passivePort = parseForPasvPort(rString);
-            SocketStable socket = new SocketStable(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.Connect(new IPEndPoint(IPAddress.Parse(IP), passivePort));
-            return socket;
+            return SocketStable.Connect(IP, passivePort, Timeout);
         }
 
         private static int parseForPasvPort(string s)
