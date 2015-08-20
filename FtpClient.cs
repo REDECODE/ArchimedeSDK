@@ -49,7 +49,6 @@ namespace Redecode.Archimede
 
             try
             {
-                bool connected = false;
                 string rString = "";
 
                 Ethernet.Connect();
@@ -69,7 +68,7 @@ namespace Redecode.Archimede
                 sendTextToSocket(SocketCommands, "PASS " + Password + "\r\n");
                 rString = readTextFromSocket(SocketCommands);
 
-                return connected;
+                return true;
             }
             catch (Exception ex)
             {
