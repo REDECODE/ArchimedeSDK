@@ -25,9 +25,9 @@ namespace Redecode.Archimede
         //--- this is for Default
         public static void UseDHCP()
         {
-            static_IP = "";
-            static_Mask = "";
-            static_Gateway = "";
+            static_IP = null;
+            static_Mask = null;
+            static_Gateway = null;
         }
 
         public static void UseStaticIp(string ip, string mask, string gateway)
@@ -65,21 +65,30 @@ namespace Redecode.Archimede
             NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
             networkInterface = interfaces[0];
 
-            if (MACAddress != null)
-            {
-                networkInterface.PhysicalAddress = MACAddress;
-            }
-
             while (IPAddress == null)
             {
                 try
                 {
-                    if (static_IP != "")
+                    if (static_IP != null)
                     {
+                        //networkInterface.ReleaseDhcpLease();
                         networkInterface.EnableStaticIP(static_IP, static_Mask, static_Gateway);
+                        //networkInterface.EnableStaticDns(new string[] { "8.8.8.8" });
+
+                        if (MACAddress != null)
+                        {
+                            networkInterface.PhysicalAddress = MACAddress;
+                            Thread.Sleep(1500);
+                        }
                     }
                     else
                     {
+                        if (MACAddress != null)
+                        {
+                            networkInterface.PhysicalAddress = MACAddress;
+                            Thread.Sleep(1500);
+                        }
+
                         networkInterface.EnableDynamicDns();
                         networkInterface.EnableDhcp();
                     }

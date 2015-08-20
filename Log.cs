@@ -6,7 +6,7 @@ using GHI.OSHW.Hardware;
 
 namespace Redecode.Archimede
 {
-    static class Log
+   public static class Log
     {
         public static string Path;
 
