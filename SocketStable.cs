@@ -45,7 +45,10 @@ namespace Redecode.Archimede
                         millsThread += 10;
                     }
 
-                    tConnect.Abort();
+                    if (tConnect.IsAlive)
+                    {
+                        tConnect.Abort();
+                    }
                 }
                 catch
                 {

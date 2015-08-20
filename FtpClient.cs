@@ -130,10 +130,11 @@ namespace Redecode.Archimede
                     return false;
                 }
 
-                FileStream FileHandle = new FileStream(local_path, FileMode.OpenOrCreate);
-                FileHandle.Write(fileContent, 0, fileContent.Length);
-                FileHandle.Close();
-
+                using (FileStream FileHandle = new FileStream(local_path, FileMode.OpenOrCreate))
+                {
+                    FileHandle.Write(fileContent, 0, fileContent.Length);
+                    FileHandle.Close();
+                }
                 return true;
             }
             catch
