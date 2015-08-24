@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual C# Express 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Redecode.ArchimedeSDK", "Redecode.ArchimedeSDK.csproj", "{00E879E7-4603-4C68-891A-76EA44EAC6C0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Seletronica.NETMF.UPC", "..\..\..\DEVELOP\ArchimedeSDK_v1.1\SDK\Libs\Seletronica.NETMF.UPC\Seletronica.NETMF.UPC.csproj", "{CBEB32EA-42A9-4477-A827-AB36C4158AEB}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,10 +13,6 @@ Global
 		{00E879E7-4603-4C68-891A-76EA44EAC6C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{00E879E7-4603-4C68-891A-76EA44EAC6C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{00E879E7-4603-4C68-891A-76EA44EAC6C0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CBEB32EA-42A9-4477-A827-AB36C4158AEB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CBEB32EA-42A9-4477-A827-AB36C4158AEB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CBEB32EA-42A9-4477-A827-AB36C4158AEB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CBEB32EA-42A9-4477-A827-AB36C4158AEB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

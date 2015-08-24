@@ -30,6 +30,7 @@
   </PropertyGroup>
   <Import Project="$(NetMfTargetsBaseDir)$(TargetFrameworkVersion)\CSharp.Targets" />
   <ItemGroup>
+    <Compile Include="Errors.cs" />
     <Compile Include="Ethernet.cs" />
     <Compile Include="FtpClient.cs" />
     <Compile Include="Led.cs" />
@@ -40,14 +41,15 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="GHI.OSHW.Hardware, Version=4.2.6.1, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="Microsoft.SPOT.Graphics" />
     <Reference Include="Microsoft.SPOT.Hardware" />
     <Reference Include="Microsoft.SPOT.IO" />
     <Reference Include="Microsoft.SPOT.Native">
     </Reference>
     <Reference Include="Microsoft.SPOT.Net" />
     <Reference Include="System" />
-    <Reference Include="System.Http" />
+    <Reference Include="System.Http">
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System.IO" />
   </ItemGroup>
 </Project>

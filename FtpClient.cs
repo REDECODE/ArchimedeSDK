@@ -26,7 +26,7 @@ namespace Redecode.Archimede
         int Timeout = 5000;
 
         public FtpClient()
-        {
+        {            
         }
 
         public FtpClient(string ip, int port)

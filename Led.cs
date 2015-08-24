@@ -6,8 +6,29 @@ namespace Redecode.Archimede
 {
     public class Led : OutputPort
     {
-        public static Led Com = new Led(48);
-        public static Led Run = new Led(49);
+        private static Led _Com;
+        private static Led _Run;
+
+        public static Led Com {
+            get {
+                if (_Com == null)
+                {
+                    _Com = new Led(48);
+                }
+                return _Com;
+            }
+        }
+        public static Led Run
+        {
+            get
+            {
+                if (_Run == null)
+                {
+                    _Run = new Led(49);
+                }
+                return _Run;
+            }
+        }
         
 
         public Led(int pin) : base((Cpu.Pin)pin, false)

@@ -16,16 +16,18 @@ namespace Redecode.Archimede
     public static class WebServer
     {        
 
-        private static readonly HttpListener httpListener = new HttpListener("http", 80);
+        private static HttpListener httpListener;
 
         public static event OnWebRequestHandler OnWebRequest;
         public static event OnAuth OnAuth;
 
-        private static ArrayList ListUrlAction = new ArrayList();
+        private static ArrayList ListUrlAction;
 
         public static void Start() {
+            httpListener = new HttpListener("http", 80);
+            ListUrlAction = new ArrayList();
             Thread webServerThread = new Thread(WebServerThread);
-            webServerThread.Start();
+            webServerThread.Start();            
         }
 
         static void WebServerThread()
@@ -106,7 +108,7 @@ namespace Redecode.Archimede
         {
             using (StreamWriter stream = new StreamWriter(response.OutputStream))
             {
-                response.ContentLength64 = stream.BaseStream.Length;
+                //response.ContentLength64 = bytes.Length;
                 stream.Write(bytes);
             }
         }
@@ -115,7 +117,7 @@ namespace Redecode.Archimede
         {
             using (StreamWriter stream = new StreamWriter(response.OutputStream))
             {
-                response.ContentLength64 = stream.BaseStream.Length;
+                //response.ContentLength64 = stream.BaseStream.Length;
                 stream.Write(str);
             }
         }
