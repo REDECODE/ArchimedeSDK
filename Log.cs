@@ -58,7 +58,7 @@ namespace Redecode.Archimede
                 if (LogPath != null)
                 {
                     FileInfo info = new FileInfo(LogPath);
-                    if (info.Length > LogPathMaxSize)
+                    if (info != null && info.Length > LogPathMaxSize)
                     {
                         File.Delete(LogPath);
                     }
