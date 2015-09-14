@@ -2,6 +2,8 @@ using System;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Net.NetworkInformation;
 using System.Threading;
+using GHI.OSHW.Hardware;
+using Microsoft.SPOT.Hardware;
 
 namespace Redecode.Archimede
 {
@@ -10,8 +12,6 @@ namespace Redecode.Archimede
 
     public class Ethernet
     {
-        private static NetworkInterface networkInterface;
-
         public static string static_IP;
         public static string static_Mask;
         public static string static_Gateway;
@@ -39,7 +39,27 @@ namespace Redecode.Archimede
 
         public static void UseMacAddress(byte[] mac)
         {
+            NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
+            var networkInterface = interfaces[0];
+
             MACAddress = mac;
+
+            bool different = false;
+
+            for (int i = 0; i < MACAddress.Length; i++)
+            {
+                if (different = (MACAddress[i] != networkInterface.PhysicalAddress[i]))
+                {
+                    break;
+                }
+            }
+
+            if (different)
+            {
+                Log.Debug("SETTING MAC Address");
+                networkInterface.PhysicalAddress = MACAddress;                             
+                PowerState.RebootDevice(true);
+            }
         }
 
         public static void UseMacAddress(string mac)
@@ -47,23 +67,24 @@ namespace Redecode.Archimede
             string[] nums = mac.Split(':');
             byte[] bytes = new byte[nums.Length];
             for (int i=0; i<nums.Length; i++) {
-               bytes[i] = (byte)Convert.ToInt32(nums[i], 16);            
+               bytes[i] = (byte)Convert.ToInt32(nums[i], 16);
             }
 
-            MACAddress = bytes;
+            UseMacAddress(bytes);
         }
 
         
 
         public static void Connect()
         {
+            Log.Debug("IPAddress "+IPAddress);
             if (IPAddress != null)
             {
                 return; //-- Already connected
             }
 
             NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
-            networkInterface = interfaces[0];
+            var networkInterface = interfaces[0];
 
             while (IPAddress == null)
             {
@@ -75,30 +96,78 @@ namespace Redecode.Archimede
                         networkInterface.EnableStaticIP(static_IP, static_Mask, static_Gateway);
                         //networkInterface.EnableStaticDns(new string[] { "8.8.8.8" });
 
-                        if (MACAddress != null)
-                        {
-                            networkInterface.PhysicalAddress = MACAddress;
-                            Thread.Sleep(1500);
-                        }
+                        //if (MACAddress != null)
+                        //{
+                        //    networkInterface.PhysicalAddress = MACAddress;
+                        //}
                     }
                     else
                     {
-                        if (MACAddress != null)
+
+                        //Microsoft.SPOT.Hardware.PowerState.RebootDevice();
+                        //networkInterface.EnableDynamicDns();
+                        /*if (MACAddress != null)
                         {
-                            networkInterface.PhysicalAddress = MACAddress;
-                            Thread.Sleep(1500);
-                        }
+                            bool different = false;
+                            for (int i=0; i<MACAddress.Length; i++) {
+                                if (different = (MACAddress[i] != networkInterface.PhysicalAddress[i])) {
+                                    break;
+                                }
+                            }
 
-                        networkInterface.EnableDynamicDns();
+                            if (different)
+                            {
+                                Log.Debug("SETTING MAC Address");
+                                networkInterface.PhysicalAddress = MACAddress;
+                                //networkInterface.RenewDhcpLease();                                
+                                PowerState.RebootDevice(true);
+                                Thread.Sleep(1500);                                
+                            }
+                        }*/
+
+                        //networkInterface.EnableStaticIP("0.0.0.0", "0.0.0.0", "0.0.0.0");
+                        //networkInterface.EnableDynamicDns();  
+                        /*if (networkInterface.IPAddress != "0.0.0.0")
+                        {
+                            networkInterface.RenewDhcpLease();
+                            Thread.Sleep(1000);
+                        }*/
+
                         networkInterface.EnableDhcp();
-                    }
 
-                    Thread.Sleep(500);
+                        int t=0;
+                        while ((networkInterface.IPAddress == "0.0.0.0")  && t++ < 30)
+                        {
+                            Thread.Sleep(100);
+                            /*
+                            try
+                            {                                
+
+                                int k = 0;
+                                while (networkInterface.IPAddress == "0.0.0.0" && k++ < 20)
+                                {
+                                    k++;
+                                    Thread.Sleep(100);
+                                } 
+                                
+                            }
+                            catch
+                            {
+                            }*/                            
+                        }
+                        /*
+                        if (networkInterface.IPAddress == "0.0.0.0")
+                        {
+                            networkInterface.RenewDhcpLease();
+                            Thread.Sleep(200);
+                        }*/
+                    }
 
                     if (networkInterface.IPAddress != "0.0.0.0")
                     {
                         IPAddress = networkInterface.IPAddress;
                     }
+                    
                 }
                 catch
                 {
@@ -106,15 +175,19 @@ namespace Redecode.Archimede
                 }
             }
 
+            Log.Debug("NEW IPAddress " + IPAddress);
+
             if (OnConnect != null)
             {
                 OnConnect();
-            }
-
+            } 
         }
 
         public static void Disconnect()
         {
+            NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
+            var networkInterface = interfaces[0];
+
             if (IPAddress == null)
             {
                 return; //-- Already disconnected
@@ -124,6 +197,12 @@ namespace Redecode.Archimede
             if (OnDisconnect != null)
             {
                 OnDisconnect();
+            }
+
+            if (static_IP == null)
+            {
+                networkInterface.RenewDhcpLease();
+                Thread.Sleep(1000);
             }
         }
     }

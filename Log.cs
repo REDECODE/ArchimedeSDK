@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using GHI.OSHW.Hardware;
 using System.Collections;
+using Microsoft.SPOT.IO;
 
 namespace Redecode.Archimede
 {
@@ -29,7 +30,7 @@ namespace Redecode.Archimede
 
         public static void Debug(string message)
         {
-            Write(message, "INFO");
+            Write(message, "DEBUG");
         }
 
         public static void Info(string message)
@@ -57,18 +58,21 @@ namespace Redecode.Archimede
 
                 if (LogPath != null)
                 {
+                    VolumeInfo SD = VolumeInfo.GetVolumes()[0];
                     FileInfo info = new FileInfo(LogPath);
-                    if (info != null && info.Length > LogPathMaxSize)
+                    if (info != null && info.Exists && info.Length > LogPathMaxSize)
                     {
-                        File.Delete(LogPath);
+                        File.Delete(info.FullName);
                     }
 
-                    using (FileStream fs = new FileStream(LogPath, FileMode.Append))
+                    using (FileStream fs = new FileStream(info.FullName, FileMode.Append))
                     {
                         byte[] bytes = Encoding.UTF8.GetBytes(message + "\r\n");
                         fs.Write(bytes, 0, bytes.Length);
-                        fs.Close();
+                        fs.Close();                        
                     }
+
+                    SD.FlushAll();
                 }
 
                 if (ArrayMessages != null)
@@ -91,7 +95,7 @@ namespace Redecode.Archimede
             LogPath = path;
         }
 
-        public static void EnableLogToMemory(int max_size = 1000)
+        public static void EnableLogToMemory(int max_size = 100)
         {
             ArrayMessagesMaxSize = max_size;
             ArrayMessages = new ArrayList();

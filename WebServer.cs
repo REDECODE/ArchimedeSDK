@@ -6,6 +6,7 @@ using System;
 using System.Text;
 using System.IO;
 using System.Collections;
+using Microsoft.SPOT.Hardware;
 
 namespace Redecode.Archimede
 {
@@ -22,66 +23,123 @@ namespace Redecode.Archimede
         public static event OnAuth OnAuth;
 
         private static ArrayList ListUrlAction;
+        public static bool IsRunning;
 
         public static void Start() {
-            httpListener = new HttpListener("http", 80);
-            ListUrlAction = new ArrayList();
+            Stop();
+
             Thread webServerThread = new Thread(WebServerThread);
             webServerThread.Start();            
         }
 
+        public static void Stop()
+        {
+            IsRunning = false;
+            if (httpListener != null)
+            {
+                httpListener.Stop();
+                httpListener = null;
+            }
+        }
+
         static void WebServerThread()
         {
-            //---- CONNECTING 
-            Ethernet.Connect();
+            IsRunning = true;
 
-            httpListener.Start();    
-
-            //----- MANAGE REQUEST
-            try
+            while (IsRunning)
             {
-                while (httpListener.IsListening)
+                try
                 {
-                    var ctx = httpListener.GetContext();
-                    //var webServerRequest = new WebServerRequest() { HttpRequest = ctx.Request };
-                    //var webServerResponse = new WebServerResponse() { HttpResponse = ctx.Response };
+                    //---- CONNECTING 
+                    Ethernet.Connect();
+
+                    Log.Debug("Create HttpListener");
+                    //----- MANAGE REQUEST
+                    httpListener = new HttpListener("http", 80);
                     try
                     {
-                        if (OnWebRequest != null)
-                        {
-                            OnWebRequest(ctx.Request, ctx.Response);
-                        }
+                        Log.Debug("Start HttpListener");
+                        httpListener.Start();
+                    }
+                    catch (Exception ex)
+                    {
+                        //-- SOFT RESET when Start() fail because it fail forever even if Connect() is ok
+                        PowerState.RebootDevice(true);
+                    }
 
-                        foreach (UrlAction webApi in ListUrlAction)
+                    Log.Debug("Start HttpListener Listening");
+                    while (httpListener.IsListening)
+                    {
+                        Log.Debug("Getting Context HttpListener");
+                        var ctx = httpListener.GetContext();
+                        Log.Debug("Got Context HttpListener");
+                        //var webServerRequest = new WebServerRequest() { HttpRequest = ctx.Request };
+                        //var webServerResponse = new WebServerResponse() { HttpResponse = ctx.Response };
+                        try
                         {
-                            if (webApi.pattern == ctx.Request.RawUrl) {
-                                if (!webApi.required_auth || OnAuth(ctx.Request))
-                                {
-                                    webApi.handler(ctx.Request, ctx.Response);
-                                    break;
-                                }                                
+                            ctx.Response.OutputStream.WriteTimeout = 2000;
+
+                            if (OnWebRequest != null)
+                            {
+                                OnWebRequest(ctx.Request, ctx.Response);
                             }
 
+                            foreach (UrlAction webApi in ListUrlAction)
+                            {
+                                if (webApi.pattern == ctx.Request.RawUrl)
+                                {   
+                                    if (webApi.required_auth)
+                                    {
+                                        if (OnAuth(ctx.Request))
+                                        {
+                                            webApi.handler(ctx.Request, ctx.Response);
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            ctx.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                                            break;
+                                        }
+                                        
+                                    } else {
+                                        webApi.handler(ctx.Request, ctx.Response);
+                                        break;
+                                    }
+                                }
+
+                            }
+                        }
+                        catch (Exception ex) {
+                            Log.Error("WebRequest Error: " + ex.Message);                            
+                        } 
+                        finally
+                        {
+                            ctx.Response.OutputStream.Close();
+                            //ctx.Response.Close();                            
+                            //ctx.Close();                            
+                            ctx = null;                            
+                            Debug.GC(true);
                         }
                     }
-                    catch { } // suppress any exceptions
-                    finally
-                    {
-                        // always close the stream
-                        ctx.Response.OutputStream.Close();
-                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.Print(ex.Message);
-                httpListener.Stop();
-                Ethernet.Disconnect();
+                catch (Exception ex)
+                {
+                    Log.Error("WebServer Disconnect: " + ex.Message);
+                    httpListener.Stop();
+                    httpListener = null;
+                    Debug.GC(true);
+                    Ethernet.Disconnect();
+                    
+                }
             }
         }
 
         public static void UrlAction(string pattern, OnWebRequestHandler handler, bool required_auth = false)
         {
+            if (ListUrlAction == null)
+            {
+                ListUrlAction = new ArrayList();
+            }
 
             ListUrlAction.Add(new UrlAction() {
                 pattern = pattern,
@@ -106,19 +164,41 @@ namespace Redecode.Archimede
     {
         public static void Bytes(this HttpListenerResponse response, byte[] bytes)
         {
-            using (StreamWriter stream = new StreamWriter(response.OutputStream))
+            /*using (StreamWriter stream = new StreamWriter(response.OutputStream))
             {
                 //response.ContentLength64 = bytes.Length;
                 stream.Write(bytes);
             }
+            */
+            //response.ContentLength64 = bytes.Length;
+            response.OutputStream.Write(bytes, 0, bytes.Length);
         }
 
         public static void String(this HttpListenerResponse response, string str)
         {
+            /*
             using (StreamWriter stream = new StreamWriter(response.OutputStream))
             {
                 //response.ContentLength64 = stream.BaseStream.Length;
                 stream.Write(str);
+            }
+             */
+                byte[] bytes = Encoding.UTF8.GetBytes(str);
+                //response.ContentLength64 = bytes.Length;
+                response.OutputStream.Write(bytes, 0, bytes.Length);
+        }
+
+        public static void File(this HttpListenerResponse response, string path, int buffer_size = 1000)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Open))
+            {
+                int bytesRead;
+                byte[] bytes = new byte[buffer_size];
+                while ((bytesRead = fs.Read(bytes, 0, buffer_size)) > 0)
+                {
+                    response.OutputStream.Write(bytes, 0, bytesRead);
+                }
+                fs.Close();
             }
         }
     }

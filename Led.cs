@@ -1,6 +1,7 @@
 using System;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Hardware;
+using System.Threading;
 
 namespace Redecode.Archimede
 {
@@ -29,7 +30,8 @@ namespace Redecode.Archimede
                 return _Run;
             }
         }
-        
+
+        Thread tBlink;
 
         public Led(int pin) : base((Cpu.Pin)pin, false)
         {            
@@ -37,17 +39,68 @@ namespace Redecode.Archimede
 
         public void On()
         {
+            StopBlink();
             Write(true);
         }
 
         public void Off()
         {
+            StopBlink();
             Write(false);
         }
 
         public void Toggle()
         {
             Write(!Read());
+        }        
+
+        public void Blink(int time = 1000)
+        {
+            StopBlink();
+
+            tBlink = new Thread(() =>
+            {
+                while (true) {
+                    Write(true);
+                    Thread.Sleep(time);
+                    Write(false);
+                    Thread.Sleep(time);
+                }
+            });
+
+            tBlink.Start();
         }
+
+        public void BlinkFor(int n, int time = 500)
+        {
+            StopBlink();
+
+            tBlink = new Thread(() =>
+            {
+                while (true) {
+                    for (int i = 0; i < n; i++)
+                    {
+                        Write(true);
+                        Thread.Sleep(time);
+                        Write(false);
+                        Thread.Sleep(time);
+                    }
+
+                    Thread.Sleep(time*2);
+                }
+            });
+
+            tBlink.Start();
+        }
+
+        public void StopBlink()
+        {
+            if (tBlink != null)
+            {
+                tBlink.Abort();
+                tBlink = null;
+            }
+        }
+
     }
 }
