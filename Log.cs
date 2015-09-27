@@ -53,8 +53,7 @@ namespace Redecode.Archimede
             try
             {
 
-                DateTime date = RTC.GetTime();
-                message = type + " " + date.ToString() + " - " + message;
+                message = type + " " + DateTime.Now.ToString() + " - " + message;
 
                 if (LogPath != null)
                 {

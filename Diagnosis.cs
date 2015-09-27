@@ -7,17 +7,17 @@ namespace Redecode.Archimede
 {
     public class Diagnosis
     {
-        public static long Ticks;
+        public static long TicksLastReboot;
 
         public static void Start()
         {
-            Ticks = RTC.GetTime().Ticks;
+            TicksLastReboot = DateTime.Now.Ticks;
         }
 
         public static DateTime DateLastReboot {
             get
             {
-                return new DateTime(Ticks);
+                return new DateTime(TicksLastReboot);
             }
         }
 

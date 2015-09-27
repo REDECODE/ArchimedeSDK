@@ -70,24 +70,25 @@ namespace Redecode.Archimede
                     Log.Debug("Start HttpListener Listening");
                     while (httpListener.IsListening)
                     {
-                        Log.Debug("Getting Context HttpListener");
+                        //Log.Debug("Getting Context HttpListener");
                         var ctx = httpListener.GetContext();
-                        Log.Debug("Got Context HttpListener");
+                        //Log.Debug("Got Context HttpListener");
                         //var webServerRequest = new WebServerRequest() { HttpRequest = ctx.Request };
                         //var webServerResponse = new WebServerResponse() { HttpResponse = ctx.Response };
                         try
                         {
                             ctx.Response.OutputStream.WriteTimeout = 2000;
-
+                            //Log.Debug("OutputStream HttpListener");
                             if (OnWebRequest != null)
                             {
                                 OnWebRequest(ctx.Request, ctx.Response);
                             }
-
+                            //Log.Debug("OnWebRequest HttpListener");
                             foreach (UrlAction webApi in ListUrlAction)
                             {
                                 if (webApi.pattern == ctx.Request.RawUrl)
-                                {   
+                                {
+                                    //Log.Debug("OnWebRequest Pattern " + webApi.pattern);
                                     if (webApi.required_auth)
                                     {
                                         if (OnAuth(ctx.Request))
@@ -98,6 +99,7 @@ namespace Redecode.Archimede
                                         else
                                         {
                                             ctx.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                                            ctx.Response.Headers.Add("WWW-Authenticate", "Basic realm=\"Archimede\"");
                                             break;
                                         }
                                         
@@ -108,28 +110,61 @@ namespace Redecode.Archimede
                                 }
 
                             }
+                            //----------
+                            //try
+                            //{
+                                //Log.Info("Closing response..");
+                                ctx.Response.Close();
+                                //Log.Info("Res Closed");
+                                /*if (ctx.Response.Close(1000))
+                                {
+                                    Log.Info("Response CLOSED");
+                                }
+                                else
+                                {
+                                    Log.Info("Response NOT CLOSED");
+                                }*/
+
+                                //ctx.Response.Close();                            
+                                //ctx.Close();                            
+                            //}
+                            //catch (Exception ex)
+                            //{
+                            //   Log.Error("WebRequest Error3");
+                            //    throw new Exception("WebRequest Error4", ex);
+                            //}
                         }
                         catch (Exception ex) {
-                            Log.Error("WebRequest Error: " + ex.Message);                            
+                            Log.Error("WebRequest Error1: " + ex.Message);
+                            //throw new Exception("WebRequest Error2", ex);
                         } 
                         finally
                         {
-                            ctx.Response.OutputStream.Close();
-                            //ctx.Response.Close();                            
-                            //ctx.Close();                            
-                            ctx = null;                            
+                           
+                            ctx = null;
                             Debug.GC(true);
+
+                            //Log.Info("WebRequest Finish");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("WebServer Disconnect: " + ex.Message);
-                    httpListener.Stop();
-                    httpListener = null;
-                    Debug.GC(true);
-                    Ethernet.Disconnect();
-                    
+
+                    try
+                    {
+                        Log.Error("WebServer Disconnect: " + ex.Message);
+                        PowerState.RebootDevice(true);
+                        
+                        httpListener.Stop();
+                        httpListener = null;
+                        Debug.GC(true);
+                        Ethernet.Disconnect();
+                    }
+                    catch (Exception e)
+                    {
+                        PowerState.RebootDevice(true);
+                    }
                 }
             }
         }
